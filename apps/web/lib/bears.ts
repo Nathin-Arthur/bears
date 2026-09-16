@@ -9,11 +9,23 @@ const TEAM = "chi"
 
 export type GameStatus = "final" | "live" | "scheduled"
 
+export type Primetime = "TNF" | "SNF" | "MNF"
+
+export const PRIMETIME_NAMES: Record<Primetime, string> = {
+  TNF: "Thursday Night Football",
+  SNF: "Sunday Night Football",
+  MNF: "Monday Night Football",
+}
+
 export type Game = {
   week: number
   date: string
+  timeKnown: boolean
+  primetime: Primetime | null
   opponent: string
   opponentName: string
+  opponentLogo: string
+  opponentLogoDark: string
   home: boolean
   status: GameStatus
   bearsScore: number | null
@@ -36,7 +48,11 @@ export type SeasonStats = {
 
 type EspnCompetitor = {
   homeAway: "home" | "away"
-  team: { abbreviation: string; displayName: string }
+  team: {
+    abbreviation: string
+    displayName: string
+    logos?: { href: string; rel: string[] }[]
+  }
   score?: { value: number }
 }
 
@@ -45,6 +61,7 @@ type EspnEvent = {
   week: { number: number }
   competitions: {
     competitors: EspnCompetitor[]
+    timeValid?: boolean
     status: { type: { state: "pre" | "in" | "post"; completed: boolean } }
   }[]
 }
@@ -84,16 +101,55 @@ function toGame(event: EspnEvent): Game {
       ? "live"
       : "scheduled"
 
+  const timeKnown = competition.timeValid !== false
+
   return {
     week: event.week.number,
     date: event.date,
+    timeKnown,
+    primetime: timeKnown ? primetimeSlot(event.date) : null,
     opponent: opponent.team.abbreviation,
     opponentName: opponent.team.displayName,
+    opponentLogo: logoUrl(opponent, false),
+    opponentLogoDark: logoUrl(opponent, true),
     home: bears.homeAway === "home",
     status,
     bearsScore: status === "scheduled" ? null : (bears.score?.value ?? 0),
     opponentScore: status === "scheduled" ? null : (opponent.score?.value ?? 0),
   }
+}
+
+const chicagoKickoff = new Intl.DateTimeFormat("en-US", {
+  weekday: "short",
+  hour: "numeric",
+  hourCycle: "h23",
+  timeZone: "America/Chicago",
+})
+
+// Standalone night games kick off after 6 PM Central on Thursday, Sunday or
+// Monday. Thanksgiving and other daytime Thursday games don't count.
+function primetimeSlot(date: string): Primetime | null {
+  const parts = chicagoKickoff.formatToParts(new Date(date))
+  const weekday = parts.find((p) => p.type === "weekday")?.value
+  const hour = Number(parts.find((p) => p.type === "hour")?.value)
+  if (hour < 18) return null
+  if (weekday === "Thu") return "TNF"
+  if (weekday === "Sun") return "SNF"
+  if (weekday === "Mon") return "MNF"
+  return null
+}
+
+// Prefer ESPN's "scoreboard" logos, which are drawn for small sizes.
+function logoUrl(competitor: EspnCompetitor, dark: boolean) {
+  const logos = competitor.team.logos ?? []
+  const match = logos.find(
+    (l) => l.rel.includes("scoreboard") && l.rel.includes("dark") === dark
+  )
+  const abbr = competitor.team.abbreviation.toLowerCase()
+  return (
+    match?.href ??
+    `https://a.espncdn.com/i/teamlogos/nfl/${dark ? "500-dark" : "500"}/scoreboard/${abbr}.png`
+  )
 }
 
 export function computeStats(season: number, games: Game[]): SeasonStats {

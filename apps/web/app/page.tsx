@@ -1,22 +1,19 @@
 import type { Metadata } from "next"
+import Image from "next/image"
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@workspace/ui/components/card"
-import { Progress } from "@workspace/ui/components/progress"
 import { cn } from "@workspace/ui/lib/utils"
+
+import { CountUp, CountUpProgress } from "@/components/count-up"
 
 import {
   GOAL_POINTS,
+  PRIMETIME_NAMES,
   GOAL_PPG,
   REVALIDATE_SECONDS,
   TOTAL_GAMES,
   getSeasonStats,
   type Game,
+  type Primetime,
   type SeasonStats,
 } from "@/lib/bears"
 
@@ -27,13 +24,8 @@ export const metadata: Metadata = {
   description: `Tracking the Chicago Bears' chase for ${GOAL_POINTS} points in a season.`,
 }
 
-const whole = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 })
-const oneDecimal = new Intl.NumberFormat("en-US", {
-  minimumFractionDigits: 1,
-  maximumFractionDigits: 1,
-})
-const gameDate = new Intl.DateTimeFormat("en-US", {
-  month: "short",
+const shortDate = new Intl.DateTimeFormat("en-US", {
+  month: "numeric",
   day: "numeric",
   timeZone: "America/Chicago",
 })
@@ -47,236 +39,201 @@ export default async function Page() {
   }
 
   return (
-    <main className="mx-auto flex min-h-svh w-full max-w-5xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-16">
-      <header className="flex flex-col gap-2">
-        <p className="text-xs font-semibold tracking-widest text-primary uppercase">
-          Chicago Bears{stats ? ` · ${stats.season} season` : ""}
-        </p>
-        <h1 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
-          The {GOAL_POINTS}-point chase
-        </h1>
-        <p className="max-w-xl text-muted-foreground">
-          Averaging {GOAL_PPG} points a game over {TOTAL_GAMES} games would
-          break the NFL record for points per game in a season.
-        </p>
-      </header>
+    <main className="mx-auto flex min-h-svh w-full max-w-4xl flex-col items-center justify-center gap-[clamp(1.25rem,4svh,3.5rem)] px-4 py-[clamp(1rem,4svh,2.5rem)]">
+      <Image
+        src="/bears-logo.svg"
+        alt="Chicago Bears"
+        width={373}
+        height={248}
+        priority
+        unoptimized
+        className="h-auto w-[clamp(3.5rem,9svh,6rem)]"
+      />
 
-      {stats ? <Tracker stats={stats} /> : <LoadError />}
+      {stats ? (
+        <>
+          <Total stats={stats} />
+          <StatRow stats={stats} />
+          <Games games={stats.games} />
+        </>
+      ) : (
+        <p className="text-muted-foreground">
+          Couldn&apos;t load the latest Bears scores. Try again in a few
+          minutes.
+        </p>
+      )}
     </main>
   )
 }
 
-function Tracker({ stats }: { stats: SeasonStats }) {
+function Total({ stats }: { stats: SeasonStats }) {
+  return (
+    <section className="flex w-full flex-col items-center gap-[clamp(0.5rem,2svh,1.25rem)] text-center">
+      <h1 className="sr-only">Total points scored</h1>
+      <div className="flex flex-col items-center">
+        <CountUp
+          value={stats.totalPoints}
+          className="font-numbers text-[clamp(5.5rem,min(40vw,24svh),19rem)] leading-[0.8] tabular-nums"
+        />
+        <span className="mt-1 text-lg text-muted-foreground sm:text-xl">
+          of {GOAL_POINTS} points
+        </span>
+      </div>
+      <CountUpProgress
+        value={stats.percentComplete}
+        aria-label={`Progress toward ${GOAL_POINTS} points`}
+        className="w-full max-w-md [&_[data-slot=progress-track]]:h-1.5 [&_[data-slot=progress-track]]:rounded-full"
+      />
+      {stats.gamesPlayed > 0 && (
+        <p className="flex items-center gap-2 text-sm font-medium">
+          <span
+            aria-hidden
+            className={cn(
+              "size-2 rounded-full",
+              stats.onPace ? "bg-primary" : "bg-muted-foreground"
+            )}
+          />
+          {stats.onPace ? "On record pace" : "Behind record pace"}
+        </p>
+      )}
+    </section>
+  )
+}
+
+function StatRow({ stats }: { stats: SeasonStats }) {
   const noGamesYet = stats.gamesPlayed === 0
 
   return (
-    <>
-      <Card>
-        <CardHeader>
-          <CardDescription>Total points scored</CardDescription>
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <span className="font-heading text-6xl font-semibold tabular-nums sm:text-7xl">
-              {whole.format(stats.totalPoints)}
-            </span>
-            <span className="text-2xl text-muted-foreground tabular-nums">
-              / {GOAL_POINTS}
-            </span>
-          </div>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          <Progress
-            value={stats.percentComplete}
-            aria-label="Progress toward 646 points"
-            className="[&_[data-slot=progress-track]]:h-3"
-          />
-          <div className="flex flex-wrap justify-between gap-2 text-muted-foreground">
-            <span>
-              {oneDecimal.format(stats.percentComplete)}% of the goal ·{" "}
-              {stats.gamesPlayed} of {TOTAL_GAMES} games played
-            </span>
-            {!noGamesYet && (
-              <span
-                className={cn(
-                  "font-medium",
-                  stats.onPace ? "text-primary" : "text-foreground"
-                )}
-              >
-                {stats.onPace ? "On record pace" : "Behind record pace"}
-              </span>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat
-          label="Current pace"
-          value={noGamesYet ? "—" : whole.format(stats.pace)}
-          detail={`Projected points over ${TOTAL_GAMES} games`}
-          highlight={stats.onPace}
-        />
-        <Stat
-          label="Points per game"
-          value={noGamesYet ? "—" : oneDecimal.format(stats.pointsPerGame)}
-          detail={`Record pace is ${GOAL_PPG} per game`}
-          highlight={stats.onPace}
-        />
-        <Stat
-          label="Needed per game"
-          value={
-            stats.neededPerGame === null
-              ? "—"
-              : oneDecimal.format(stats.neededPerGame)
-          }
-          detail={
-            stats.gamesRemaining === 0
-              ? "Regular season is over"
-              : `Over the final ${stats.gamesRemaining} ${stats.gamesRemaining === 1 ? "game" : "games"}`
-          }
-        />
-        <Stat
-          label="Points away"
-          value={whole.format(stats.pointsAway)}
-          detail={
-            stats.pointsAway === 0
-              ? "Goal reached"
-              : `Still needed to reach ${GOAL_POINTS}`
-          }
-        />
-      </section>
-
-      <GameLog games={stats.games} />
-
-      <p className="text-xs text-muted-foreground">
-        Scores from ESPN, refreshed every {REVALIDATE_SECONDS / 60} minutes.
-        Only completed regular-season games count toward the totals.
-      </p>
-    </>
+    <dl className="grid w-full grid-cols-4 gap-x-2 text-center sm:gap-x-6">
+      <Stat
+        label="Pace"
+        value={noGamesYet ? null : stats.pace}
+        note={`over ${TOTAL_GAMES} games`}
+      />
+      <Stat
+        label="Per game"
+        value={noGamesYet ? null : stats.pointsPerGame}
+        decimals={1}
+        note={`goal ${GOAL_PPG}`}
+      />
+      <Stat
+        label="Needed per game"
+        value={stats.neededPerGame}
+        decimals={1}
+        note={
+          stats.gamesRemaining === 0
+            ? "season over"
+            : `${stats.gamesRemaining} ${stats.gamesRemaining === 1 ? "game" : "games"} left`
+        }
+      />
+      <Stat
+        label="Points away"
+        value={stats.pointsAway}
+        note={stats.pointsAway === 0 ? "goal reached" : `from ${GOAL_POINTS}`}
+      />
+    </dl>
   )
 }
 
 function Stat({
   label,
   value,
-  detail,
-  highlight = false,
+  decimals = 0,
+  note,
 }: {
   label: string
-  value: string
-  detail: string
-  highlight?: boolean
+  value: number | null
+  decimals?: number
+  note: string
 }) {
   return (
-    <Card size="sm">
-      <CardHeader>
-        <CardDescription>{label}</CardDescription>
+    <div className="flex flex-col items-center gap-0.5">
+      <dt className="flex min-h-[2lh] items-end justify-center text-[10px] leading-tight tracking-wide text-muted-foreground uppercase sm:min-h-0 sm:text-xs">
+        {label}
+      </dt>
+      <dd className="font-numbers text-3xl leading-none tabular-nums sm:text-5xl">
+        {value === null ? "—" : <CountUp value={value} decimals={decimals} />}
+      </dd>
+      <dd className="text-[10px] text-muted-foreground sm:text-xs">{note}</dd>
+    </div>
+  )
+}
+
+function Games({ games }: { games: Game[] }) {
+  return (
+    <section className="flex w-full flex-col items-center gap-[clamp(0.75rem,2.5svh,1.5rem)]">
+      <h2 className="text-xs tracking-wide text-muted-foreground uppercase">
+        Game by game
+      </h2>
+      <ol className="flex w-full flex-wrap justify-center gap-y-[clamp(0.5rem,2svh,1.25rem)]">
+        {games.map((game) => (
+          <GameItem key={game.week} game={game} />
+        ))}
+      </ol>
+    </section>
+  )
+}
+
+function GameItem({ game }: { game: Game }) {
+  const upcoming = game.status === "scheduled"
+  const date = game.timeKnown ? shortDate.format(new Date(game.date)) : "TBD"
+  const matchup = `${game.home ? "vs" : "at"} ${game.opponentName}`
+  const primetime = game.primetime ? `, ${PRIMETIME_NAMES[game.primetime]}` : ""
+  const label = upcoming
+    ? `Week ${game.week}, ${matchup}, ${date}${primetime}`
+    : `Week ${game.week}, ${matchup}${primetime}: Bears ${game.bearsScore}, ${game.opponent} ${game.opponentScore}${game.status === "live" ? " (live)" : ""}`
+
+  return (
+    <li className="flex w-1/9 flex-col items-center gap-1" aria-label={label}>
+      <div
+        className={cn(
+          "relative size-7 sm:size-10",
+          upcoming && "opacity-30 grayscale"
+        )}
+      >
+        <Image
+          src={game.opponentLogo}
+          alt=""
+          fill
+          sizes="48px"
+          className="object-contain dark:hidden"
+        />
+        <Image
+          src={game.opponentLogoDark}
+          alt=""
+          fill
+          sizes="48px"
+          className="hidden object-contain dark:block"
+        />
+      </div>
+      {upcoming ? (
+        <span className="flex h-5 items-center text-[10px] text-muted-foreground tabular-nums sm:h-6 sm:text-xs">
+          {date}
+        </span>
+      ) : (
         <span
           className={cn(
-            "font-heading text-4xl font-semibold tabular-nums",
-            highlight && "text-primary"
+            "flex h-5 items-center font-numbers text-lg leading-none tabular-nums sm:h-6 sm:text-2xl",
+            game.status === "live" && "text-primary"
           )}
         >
-          {value}
+          <CountUp value={game.bearsScore ?? 0} />
         </span>
-        <span className="text-xs text-muted-foreground">{detail}</span>
-      </CardHeader>
-    </Card>
+      )}
+      <span className="flex h-3.5 items-center">
+        {game.primetime && <PrimetimeBadge slot={game.primetime} />}
+      </span>
+    </li>
   )
 }
 
-function GameLog({ games }: { games: Game[] }) {
-  const runningTotals = games.reduce<number[]>((totals, game) => {
-    const previous = totals.at(-1) ?? 0
-    const points = game.status === "final" ? (game.bearsScore ?? 0) : 0
-    return [...totals, previous + points]
-  }, [])
-
+function PrimetimeBadge({ slot }: { slot: Primetime }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Game log</CardTitle>
-      </CardHeader>
-      <CardContent className="-mx-2 overflow-x-auto">
-        <table className="w-full min-w-[480px] text-left tabular-nums">
-          <thead className="text-xs text-muted-foreground uppercase">
-            <tr>
-              <th className="px-2 py-2 font-medium">Wk</th>
-              <th className="px-2 py-2 font-medium">Date</th>
-              <th className="px-2 py-2 font-medium">Opponent</th>
-              <th className="px-2 py-2 font-medium">Result</th>
-              <th className="px-2 py-2 text-right font-medium">Bears pts</th>
-              <th className="px-2 py-2 text-right font-medium">Season total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {games.map((game, index) => {
-              const upcoming = game.status === "scheduled"
-
-              return (
-                <tr
-                  key={game.week}
-                  className={cn(
-                    "border-t border-border",
-                    upcoming && "text-muted-foreground"
-                  )}
-                >
-                  <td className="px-2 py-2.5">{game.week}</td>
-                  <td className="px-2 py-2.5">
-                    {gameDate.format(new Date(game.date))}
-                  </td>
-                  <td className="px-2 py-2.5" title={game.opponentName}>
-                    {game.home ? "vs" : "@"} {game.opponent}
-                  </td>
-                  <td className="px-2 py-2.5">
-                    <Result game={game} />
-                  </td>
-                  <td className="px-2 py-2.5 text-right font-medium">
-                    {game.status === "final" ? game.bearsScore : "—"}
-                  </td>
-                  <td className="px-2 py-2.5 text-right">
-                    {game.status === "final" ? runningTotals[index] : "—"}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </CardContent>
-    </Card>
-  )
-}
-
-function Result({ game }: { game: Game }) {
-  if (game.status === "scheduled") return <span>Upcoming</span>
-
-  const score = `${game.bearsScore}–${game.opponentScore}`
-  if (game.status === "live") {
-    return <span className="text-primary">Live · {score}</span>
-  }
-
-  const outcome =
-    game.bearsScore! > game.opponentScore!
-      ? "W"
-      : game.bearsScore! < game.opponentScore!
-        ? "L"
-        : "T"
-  return (
-    <span>
-      <span className="font-semibold">{outcome}</span> {score}
+    <span
+      aria-hidden
+      className="rounded-[3px] border border-primary px-1 text-[9px] leading-[12px] font-bold tracking-wider text-foreground sm:text-[10px]"
+    >
+      {slot}
     </span>
-  )
-}
-
-function LoadError() {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Scores unavailable</CardTitle>
-        <CardDescription>
-          Couldn&apos;t load the latest Bears scores from ESPN. The page will
-          try again on the next refresh.
-        </CardDescription>
-      </CardHeader>
-    </Card>
   )
 }
