@@ -19,9 +19,14 @@ import {
 // Next.js requires a literal here; keep in sync with REVALIDATE_SECONDS.
 export const revalidate = 900
 
+const title = "Bears Points Tracker"
+const description = `Tracking the Chicago Bears' chase for ${GOAL_POINTS} points in a season.`
+
 export const metadata: Metadata = {
-  title: "Bears Points Tracker",
-  description: `Tracking the Chicago Bears' chase for ${GOAL_POINTS} points in a season.`,
+  title,
+  description,
+  openGraph: { title, description, type: "website" },
+  twitter: { card: "summary_large_image", title, description },
 }
 
 const shortDate = new Intl.DateTimeFormat("en-US", {
