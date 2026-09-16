@@ -1,8 +1,11 @@
-import { Geist, Geist_Mono, Jersey_25, Roboto, Outfit } from "next/font/google"
+import { Geist_Mono, Jersey_25, Roboto, Outfit } from "next/font/google"
+import Script from "next/script"
 
 import "@workspace/ui/globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { cn } from "@workspace/ui/lib/utils"
+
+const GA_MEASUREMENT_ID = "G-QH1NMMRNB7"
 
 const outfitHeading = Outfit({ subsets: ["latin"], variable: "--font-heading" })
 
@@ -39,6 +42,21 @@ export default function RootLayout({
     >
       <body>
         <ThemeProvider forcedTheme="dark">{children}</ThemeProvider>
+
+        {/* Google tag (gtag.js) */}
+        <Script
+          src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+
+            gtag('config', '${GA_MEASUREMENT_ID}');
+          `}
+        </Script>
       </body>
     </html>
   )
