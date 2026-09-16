@@ -9,7 +9,6 @@ import {
   GOAL_POINTS,
   PRIMETIME_NAMES,
   GOAL_PPG,
-  REVALIDATE_SECONDS,
   TOTAL_GAMES,
   getSeasonStats,
   type Game,
@@ -17,7 +16,8 @@ import {
   type SeasonStats,
 } from "@/lib/bears"
 
-export const revalidate = REVALIDATE_SECONDS
+// Next.js requires a literal here; keep in sync with REVALIDATE_SECONDS.
+export const revalidate = 900
 
 export const metadata: Metadata = {
   title: "Bears Points Tracker",
